@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Launch the gripper control node -->
+  <include file="$(find robotiq_2f_85_modbus_tcp)/launch/robotiq_2f_85_modbus_tcp_node.launch" />
+</launch>

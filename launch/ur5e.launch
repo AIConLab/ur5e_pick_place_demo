@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Launch the UR robot bringup -->
+  <include file="$(find husky_ur_bringup)/launch/husky_ur_bringup.launch" />
+
+  <!-- Wait for the robot drivers to fully initialize -->
+  <node name="wait_for_robot" pkg="ur5e_pick_place_demo" type="wait_for_robot.sh" output="screen" />
+
+
+</launch>
