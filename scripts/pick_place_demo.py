@@ -38,7 +38,17 @@ class PickAndPlace:
         
         
     
-    def move_to_joint_positions(self, positions, duration=1):
+    def calculate_duration(self, speed_percentage):
+        """Calculate the duration based on speed percentage"""
+        min_duration = 1.0  # seconds
+        max_duration = 5.0  # seconds
+
+        duration = min_duration + ((max_duration - min_duration) * ((100 - speed_percentage) / 100))
+
+        return duration
+
+    
+    def move_to_joint_positions(self, positions, speed_percentage):
         """Move the arm to the specified joint positions"""
         goal = FollowJointTrajectoryGoal()
         goal.trajectory = JointTrajectory()
@@ -46,6 +56,18 @@ class PickAndPlace:
         
         point = JointTrajectoryPoint()
         point.positions = positions
+
+        if (speed_percentage > 100):
+            speed_percentage = 100
+
+        elif (speed_percentage < 0):
+            speed_percentage = 0
+
+        else:
+            int(speed_percentage)
+
+        duration = self.calculate_duration(speed_percentage)
+
         point.time_from_start = rospy.Duration(duration)
         
         goal.trajectory.points.append(point)
@@ -59,39 +81,42 @@ class PickAndPlace:
         else:
             rospy.logerr("Movement failed")
     
-    def run_pick_and_place_cycle(self):
+    def run_pick_and_place_cycle(self, current_speed_percentage):
         """Run one complete pick and place cycle"""
-        
+
         # Move to left up (safe position)
         rospy.loginfo("Moving to left up position")
-        self.move_to_joint_positions(self.left_up)
+        self.move_to_joint_positions(self.left_up, current_speed_percentage)
         
         # Move to left pickup
         rospy.loginfo("Moving to left pickup position")
-        self.move_to_joint_positions(self.left_pickup)
+        self.move_to_joint_positions(self.left_pickup, current_speed_percentage)
         
         
         # Move back to left up (safe position with object)
         rospy.loginfo("Moving up with object")
-        self.move_to_joint_positions(self.left_up)
+        self.move_to_joint_positions(self.left_up, current_speed_percentage)
         
         # Move to right up (above drop location)
         rospy.loginfo("Moving to right up position")
-        self.move_to_joint_positions(self.right_up)
+        self.move_to_joint_positions(self.right_up, current_speed_percentage)
         
         # Move to right down (drop location)
         rospy.loginfo("Moving to right drop position")
-        self.move_to_joint_positions(self.right_down)
+        self.move_to_joint_positions(self.right_down, current_speed_percentage)
         
         
         # Move back to right up (safe position)
         rospy.loginfo("Moving back up after dropping")
-        self.move_to_joint_positions(self.right_up)
+        self.move_to_joint_positions(self.right_up, current_speed_percentage)
         
         rospy.loginfo("Pick and place cycle completed")
 
 def main():
     rospy.loginfo("Starting pick and place demo")
+
+    # Get speed pecentage from parameter server
+    speed_percentage = rospy.get_param('~speed_percentage', 50)
     
     # Create pick and place object
     pick_place = PickAndPlace()
@@ -102,7 +127,7 @@ def main():
         while not rospy.is_shutdown():
             cycle_count += 1
             rospy.loginfo("Starting pick and place cycle #{}".format(cycle_count))
-            pick_place.run_pick_and_place_cycle()
+            pick_place.run_pick_and_place_cycle(speed_percentage)
             rospy.loginfo("Completed cycle #{}".format(cycle_count))
             
             # Add a small delay between cycles

@@ -2,5 +2,6 @@
 <launch>
   <!-- Launch the pick and place node -->
   <node name="pick_place_demo" pkg="ur5e_pick_place_demo" type="pick_place_demo.py" output="screen">
+    <param name="speed_percentage" value="100"/>
   </node>
 </launch>
