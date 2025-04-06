@@ -5,7 +5,7 @@ import actionlib
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from std_srvs.srv import Empty
-from std_msgs.msg import Bool, Int32
+from std_msgs.msg import Bool, Int32, Int64
 import time
 
 from enum import Enum
@@ -23,6 +23,9 @@ class PickAndPlace:
         self.current_state = MotionState.STARTED
         self.current_speed = 100
         self.is_executing = False  # Flag to track if motion is in progress
+
+    # Add publisher for command execution timestamp
+        self.cmd_executed_pub = rospy.Publisher('/cmd_executed_timestamp', Int64, queue_size=10)
 
         # Subscribe to state command updates
         self.start_cmd_sub = rospy.Subscriber('/pp_start', Int32, self.start_motions)
@@ -63,7 +66,9 @@ class PickAndPlace:
         self.right_up = [-1.4435839653015137, -1.2566341918757935, 0.5026633739471436, -1.2548790735057374, 1.5954649448394775, -0.07733804384340459]
         self.right_down = [-1.4435715675354004, -1.90, 0.5026873350143433, -1.2549031537822266, 1.5954411029815674, -0.07731372514833623]
     
+
     def start_motions(self, msg):
+
         """
         Callback for start motion commands.
         Sets speed to the received value (or 100% if the message doesn't contain a valid speed).
@@ -109,6 +114,7 @@ class PickAndPlace:
         except Exception as e:
             rospy.logwarn(f"Error starting program: {e}")
     
+
     def slow_motions(self, msg):
         """
         Callback for slow motion commands.
@@ -140,18 +146,40 @@ class PickAndPlace:
             try:
                 self.pause_service()
                 rospy.loginfo("Robot paused via dashboard service")
+                
+                # Publish execution timestamp - after the robot has been paused
+                timestamp = rospy.Time.now().to_nsec()
+                self.cmd_executed_pub.publish(timestamp)
+                rospy.loginfo(f"Published command executed timestamp: {timestamp}")
+                
             except rospy.ServiceException as e:
                 rospy.logerr(f"Failed to pause robot: {e}")
                 # Fallback to canceling the current goal
                 if self.is_executing:
                     self.client.cancel_goal()
                     rospy.loginfo("Cancelled current motion goal as fallback")
+                    
+                    # Still publish execution timestamp, even if using fallback
+                    timestamp = rospy.Time.now().to_nsec()
+                    self.cmd_executed_pub.publish(timestamp)
+                    rospy.loginfo(f"Published command executed timestamp (fallback): {timestamp}")
         else:
             # If pause service is not available, cancel the current goal
             if self.is_executing:
                 self.client.cancel_goal()
                 rospy.loginfo("Cancelled current motion goal (pause service not available)")
+                
+                # Publish execution timestamp
+                timestamp = rospy.Time.now().to_nsec()
+                self.cmd_executed_pub.publish(timestamp)
+                rospy.loginfo(f"Published command executed timestamp (cancel goal): {timestamp}")
+            else:
+                # Even if no execution was in progress, still publish the timestamp
+                timestamp = rospy.Time.now().to_nsec()
+                self.cmd_executed_pub.publish(timestamp)
+                rospy.loginfo(f"Published command executed timestamp (no motion): {timestamp}")
     
+
     def move_to_joint_positions(self, positions, speed_percentage):
         """Move the arm to the specified joint positions"""
         # If we're in STOPPED state, don't move
@@ -196,6 +224,7 @@ class PickAndPlace:
             rospy.logerr("Movement failed")
             return False
     
+
     def run_motion_cycle(self):
         """Run one complete pick and place cycle"""
         if self.current_state == MotionState.STOPPED:
